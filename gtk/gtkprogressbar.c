@@ -35,6 +35,7 @@
 #include "gtkstylecontextprivate.h"
 #include "gtkcssnodeprivate.h"
 #include "gtkcssstylepropertyprivate.h"
+#include "gtkcsscustomgadgetprivate.h"
 
 #include "a11y/gtkprogressbaraccessible.h"
 
@@ -91,8 +92,8 @@ struct _GtkProgressBarPrivate
 {
   gchar         *text;
 
-  GtkCssNode    *trough_node;
-  GtkCssNode    *progress_node;
+  GtkCssGadget  *trough;
+  GtkCssGadget  *progress;
 
   gdouble        fraction;
   gdouble        pulse_fraction;
@@ -345,29 +346,6 @@ gtk_progress_bar_class_init (GtkProgressBarClass *class)
 }
 
 static void
-node_style_changed_cb (GtkCssNode  *node,
-                       GtkCssStyle *old_style,
-                       GtkCssStyle *new_style,
-                       GtkWidget   *widget)
-{
-  GtkBitmask *changes;
-  static GtkBitmask *affects_size = NULL;
-
-  if (G_UNLIKELY (affects_size == NULL))
-    affects_size = _gtk_css_style_property_get_mask_affecting (GTK_CSS_AFFECTS_SIZE | GTK_CSS_AFFECTS_CLIP);
-
-  changes = _gtk_bitmask_new ();
-  changes = gtk_css_style_add_difference (changes, old_style, new_style);
-
-  if (_gtk_bitmask_intersects (changes, affects_size))
-    gtk_widget_queue_resize (widget);
-  else
-    gtk_widget_queue_draw (widget);
-
-  _gtk_bitmask_free (changes);
-}
-
-static void
 update_node_classes (GtkProgressBar *pbar)
 {
   GtkProgressBarPrivate *priv = pbar->priv;
@@ -417,24 +395,65 @@ update_node_classes (GtkProgressBar *pbar)
     }
 
   if (left)
-    gtk_css_node_add_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_LEFT));
+    gtk_css_gadget_add_class (priv->progress, GTK_STYLE_CLASS_LEFT);
   else
-    gtk_css_node_remove_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_LEFT));
+    gtk_css_gadget_remove_class (priv->progress, GTK_STYLE_CLASS_LEFT);
 
   if (right)
-    gtk_css_node_add_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_RIGHT));
+    gtk_css_gadget_add_class (priv->progress, GTK_STYLE_CLASS_RIGHT);
   else
-    gtk_css_node_remove_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_RIGHT));
+    gtk_css_gadget_remove_class (priv->progress, GTK_STYLE_CLASS_RIGHT);
 
   if (top)
-    gtk_css_node_add_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_TOP));
+    gtk_css_gadget_add_class (priv->progress, GTK_STYLE_CLASS_TOP);
   else
-    gtk_css_node_remove_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_TOP));
+    gtk_css_gadget_remove_class (priv->progress, GTK_STYLE_CLASS_TOP);
 
   if (bottom)
-    gtk_css_node_add_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_BOTTOM));
+    gtk_css_gadget_add_class (priv->progress, GTK_STYLE_CLASS_BOTTOM);
   else
-    gtk_css_node_remove_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_BOTTOM));
+    gtk_css_gadget_remove_class (priv->progress, GTK_STYLE_CLASS_BOTTOM);
+}
+
+static void
+gtk_progress_bar_get_trough_size (GtkCssGadget   *gadget,
+                                  GtkOrientation  orientation,
+                                  gint            for_size,
+                                  gint           *minimum,
+                                  gint           *natural,
+                                  gint           *minimum_baseline,
+                                  gint           *natural_baseline,
+                                  gpointer        data)
+{
+  GtkWidget *widget;
+  GtkProgressBar *pbar;
+  GtkProgressBarPrivate *priv;
+
+  widget = gtk_css_gadget_get_owner (gadget);
+  pbar = GTK_PROGRESS_BAR (widget);
+  priv = pbar->priv;
+
+  if (orientation == GTK_ORIENTATION_HORIZONTAL)
+    {
+      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+        gtk_widget_style_get (widget, "min-horizontal-bar-width", minimum, NULL);
+      else
+        gtk_widget_style_get (widget, "min-vertical-bar-width", minimum, NULL);
+    }
+  else
+    {
+      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+        gtk_widget_style_get (widget, "min-horizontal-bar-height", minimum, NULL);
+      else
+        gtk_widget_style_get (widget, "min-vertical-bar-height", minimum, NULL);
+    }
+
+  *natural = *minimum;
+
+  if (minimum_baseline)
+    *minimum_baseline = -1;
+  if (natural_baseline)
+    *natural_baseline = -1;
 }
 
 static void
@@ -464,19 +483,30 @@ gtk_progress_bar_init (GtkProgressBar *pbar)
 
   widget_node = gtk_widget_get_css_node (GTK_WIDGET (pbar));
 
-  priv->trough_node = gtk_css_node_new ();
-  gtk_css_node_set_name (priv->trough_node, I_("trough"));
-  gtk_css_node_set_parent (priv->trough_node, widget_node);
-  gtk_css_node_set_state (priv->trough_node, gtk_css_node_get_state (widget_node));
-  g_signal_connect_object (priv->trough_node, "style-changed", G_CALLBACK (node_style_changed_cb), pbar, 0);
-  g_object_unref (priv->trough_node);
+  priv->trough = gtk_css_custom_gadget_new ("trough",
+                                            GTK_WIDGET (pbar),
+                                            NULL,
+                                            NULL,
+                                            gtk_progress_bar_get_trough_size,
+                                            NULL,
+                                            NULL,
+                                            NULL,
+                                            NULL);
 
-  priv->progress_node = gtk_css_node_new ();
-  gtk_css_node_set_name (priv->progress_node, I_("progress"));
-  gtk_css_node_set_parent (priv->progress_node, priv->trough_node);
-  gtk_css_node_set_state (priv->progress_node, gtk_css_node_get_state (widget_node));
-  g_signal_connect_object (priv->progress_node, "style-changed", G_CALLBACK (node_style_changed_cb), pbar, 0);
-  g_object_unref (priv->progress_node);
+  gtk_css_node_set_parent (gtk_css_gadget_get_node (priv->trough), widget_node);
+  gtk_css_node_set_state (gtk_css_gadget_get_node (priv->trough), gtk_css_node_get_state (widget_node));
+
+  priv->progress = gtk_css_custom_gadget_new ("progress",
+                                              GTK_WIDGET (pbar),
+                                              priv->trough,
+                                              NULL,
+                                              gtk_progress_bar_get_trough_size,
+                                              NULL,
+                                              NULL, //gtk_progress_bar_draw_progress,
+                                              NULL,
+                                              NULL);
+
+  gtk_css_node_set_state (gtk_css_gadget_get_node (priv->progress), gtk_css_node_get_state (widget_node));
 
   update_node_classes (pbar);
 }
@@ -581,6 +611,8 @@ gtk_progress_bar_finalize (GObject *object)
   GtkProgressBar *pbar = GTK_PROGRESS_BAR (object);
   GtkProgressBarPrivate *priv = pbar->priv;
 
+  g_clear_object (&priv->trough);
+
   if (priv->activity_mode)
     gtk_progress_bar_act_mode_leave (pbar);
 
@@ -604,7 +636,88 @@ static void
 gtk_progress_bar_size_allocate (GtkWidget     *widget,
                                 GtkAllocation *allocation)
 {
+  GtkProgressBar *pbar = GTK_PROGRESS_BAR (widget);
+  GtkProgressBarPrivate *priv = pbar->priv;
+  gint width, height, bar_width, bar_height;
+  GtkAllocation alloc;
+  GtkAllocation area;
+  GdkRectangle clip;
+  gboolean inverted;
+
   GTK_WIDGET_CLASS (gtk_progress_bar_parent_class)->size_allocate (widget, allocation);
+
+  width = gtk_widget_get_allocated_width (widget);
+  height = gtk_widget_get_allocated_height (widget);
+
+  if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+    {
+      gtk_css_gadget_get_preferred_size (priv->trough, GTK_ORIENTATION_VERTICAL, -1, &bar_height, NULL,  NULL, NULL);
+      bar_width = width;
+    }
+  else
+    {
+      gtk_css_gadget_get_preferred_size (priv->trough, GTK_ORIENTATION_HORIZONTAL, -1, &bar_width, NULL,  NULL, NULL);
+      bar_height = height;
+    }
+
+  alloc.x = allocation->x + width - bar_width;
+  alloc.y = allocation->y + height - bar_height;
+  alloc.width = bar_width;
+  alloc.height = bar_height;
+
+  gtk_css_gadget_allocate (priv->trough, &alloc, -1, &clip);
+
+  inverted = priv->inverted;
+  if (gtk_widget_get_direction (widget) == GTK_TEXT_DIR_RTL)
+    {
+      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+        inverted = !inverted;
+    }
+
+  if (priv->activity_mode)
+    {
+      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+        {
+          area.width = MAX (2, bar_width / priv->activity_blocks);
+          area.x = alloc.x + priv->activity_pos * (bar_width - area.width);
+          area.y = alloc.y;
+          area.height = alloc.height;
+        }
+      else
+        {
+          area.height = MAX (2, bar_height / priv->activity_blocks);
+          area.y = alloc.y + priv->activity_pos * (bar_height - area.height);
+          area.x = alloc.x;
+          area.width = alloc.width;
+        }
+    }
+  else
+    {
+      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+        {
+          area.width = bar_width * priv->fraction;
+          area.height = alloc.height;
+          area.y = alloc.y;
+
+          if (!inverted)
+            area.x = alloc.x;
+          else
+            area.x = alloc.x + alloc.width - area.width;
+        }
+      else
+        {
+          area.width = alloc.width;
+          area.height = bar_height * priv->fraction;
+          area.x = alloc.x;
+
+          if (!inverted)
+            area.y = alloc.y;
+          else
+            area.y = alloc.y + alloc.height - area.height;
+        }
+    }
+
+  gtk_css_gadget_allocate (priv->progress, &area, -1, &clip);
 
   _gtk_widget_set_simple_clip (widget, NULL);
 }
@@ -665,14 +778,7 @@ gtk_progress_bar_get_preferred_width (GtkWidget *widget,
       g_free (buf);
     }
 
-  if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
-    gtk_widget_style_get (widget,
-                          "min-horizontal-bar-width", &bar_width,
-                          NULL);
-  else
-    gtk_widget_style_get (widget,
-                          "min-vertical-bar-width", &bar_width,
-                          NULL);
+  gtk_css_gadget_get_preferred_size (priv->trough, GTK_ORIENTATION_HORIZONTAL, -1, &bar_width, NULL, NULL, NULL);
 
   *minimum = *natural = width + bar_width;
 }
@@ -715,14 +821,7 @@ gtk_progress_bar_get_preferred_height (GtkWidget *widget,
       g_free (buf);
     }
 
-  if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
-    gtk_widget_style_get (widget,
-                          "min-horizontal-bar-height", &bar_height,
-                          NULL);
-  else
-    gtk_widget_style_get (widget,
-                          "min-vertical-bar-height", &bar_height,
-                          NULL);
+  gtk_css_gadget_get_preferred_size (priv->trough, GTK_ORIENTATION_VERTICAL, -1, &bar_height, NULL, NULL, NULL);
 
   *minimum = *natural = height + bar_height;
 }
@@ -782,7 +881,7 @@ tick_cb (GtkWidget     *widget,
 
   update_node_classes (pbar);
 
-  gtk_widget_queue_draw (widget);
+  gtk_widget_queue_allocate (widget);
 
   return G_SOURCE_CONTINUE;
 }
@@ -795,7 +894,7 @@ gtk_progress_bar_act_mode_enter (GtkProgressBar *pbar)
   GtkOrientation orientation;
   gboolean inverted;
 
-  gtk_css_node_add_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_PULSE));
+  gtk_css_gadget_add_class (priv->progress, GTK_STYLE_CLASS_PULSE);
 
   orientation = priv->orientation;
   inverted = priv->inverted;
@@ -850,130 +949,8 @@ gtk_progress_bar_act_mode_leave (GtkProgressBar *pbar)
     gtk_widget_remove_tick_callback (GTK_WIDGET (pbar), priv->tick_id);
   priv->tick_id = 0;
 
-  gtk_css_node_remove_class (priv->progress_node, g_quark_from_static_string (GTK_STYLE_CLASS_PULSE));
+  gtk_css_gadget_remove_class (priv->progress, GTK_STYLE_CLASS_PULSE);
   update_node_classes (pbar);
-}
-
-static void
-gtk_progress_bar_get_activity (GtkProgressBar *pbar,
-                               GtkOrientation  orientation,
-                               gint           *offset,
-                               gint           *amount)
-{
-  GtkProgressBarPrivate *priv = pbar->priv;
-  GtkWidget *widget = GTK_WIDGET (pbar);
-  GtkStyleContext *context;
-  GtkAllocation allocation;
-  GtkStateFlags state;
-  GtkBorder padding;
-  int size;
-
-  context = gtk_widget_get_style_context (widget);
-  state = gtk_style_context_get_state (context);
-  gtk_widget_get_allocation (widget, &allocation);
-  gtk_style_context_get_padding (context, state, &padding);
-
-  if (orientation == GTK_ORIENTATION_HORIZONTAL)
-    size = allocation.width - padding.left - padding.top;
-  else
-    size = allocation.height - padding.left - padding.top;
-
-  *amount = MAX (2, size / priv->activity_blocks);
-  *offset = priv->activity_pos * (size - *amount);
-}
-
-static void
-gtk_progress_bar_paint_activity (GtkProgressBar *pbar,
-                                 cairo_t        *cr,
-                                 GtkOrientation  orientation,
-                                 gboolean        inverted,
-                                 int             x,
-                                 int             y,
-                                 int             width,
-                                 int             height)
-{
-  GtkProgressBarPrivate *priv = pbar->priv;
-  GtkStyleContext *context;
-  GtkBorder padding;
-  GtkWidget *widget = GTK_WIDGET (pbar);
-  GdkRectangle area;
-
-  context = gtk_widget_get_style_context (widget);
-  gtk_style_context_get_padding (context, gtk_style_context_get_state (context), &padding);
-
-  gtk_style_context_save_to_node (context, priv->progress_node);
-
-  if (orientation == GTK_ORIENTATION_HORIZONTAL)
-    {
-      gtk_progress_bar_get_activity (pbar, orientation, &area.x, &area.width);
-      area.y = y + padding.top;
-      area.height = height - padding.top - padding.bottom;
-    }
-  else
-    {
-      gtk_progress_bar_get_activity (pbar, orientation, &area.y, &area.height);
-      area.x = x + padding.left;
-      area.width = width - padding.left - padding.right;
-    }
-
-  gtk_render_background (context, cr, area.x, area.y, area.width, area.height);
-  gtk_render_frame (context, cr, area.x, area.y, area.width, area.height);
-
-  gtk_style_context_restore (context);
-}
-
-static void
-gtk_progress_bar_paint_continuous (GtkProgressBar *pbar,
-                                   cairo_t        *cr,
-                                   gint            amount,
-                                   GtkOrientation  orientation,
-                                   gboolean        inverted,
-                                   int             x,
-                                   int             y,
-                                   int             width,
-                                   int             height)
-{
-  GtkProgressBarPrivate *priv = pbar->priv;
-  GtkStyleContext *context;
-  GtkBorder padding;
-  GtkWidget *widget = GTK_WIDGET (pbar);
-  GdkRectangle area;
-
-  if (amount <= 0)
-    return;
-
-  context = gtk_widget_get_style_context (widget);
-  gtk_style_context_get_padding (context, gtk_style_context_get_state (context), &padding);
-
-  gtk_style_context_save_to_node (context, priv->progress_node);
-
-  if (orientation == GTK_ORIENTATION_HORIZONTAL)
-    {
-      area.width = amount;
-      area.height = height - padding.top - padding.bottom;
-      area.y = y + padding.top;
-
-      if (!inverted)
-        area.x = x + padding.left;
-      else
-        area.x = width - amount - padding.right;
-    }
-  else
-    {
-      area.width = width - padding.left - padding.right;
-      area.height = amount;
-      area.x = x + padding.left;
-
-      if (!inverted)
-        area.y = y + padding.top;
-      else
-        area.y = height - amount - padding.bottom;
-    }
-
-  gtk_render_background (context, cr, area.x, area.y, area.width, area.height);
-  gtk_render_frame (context, cr, area.x, area.y, area.width, area.height);
-
-  gtk_style_context_restore (context);
 }
 
 static void
@@ -1113,17 +1090,9 @@ gtk_progress_bar_draw (GtkWidget *widget,
 {
   GtkProgressBar *pbar = GTK_PROGRESS_BAR (widget);
   GtkProgressBarPrivate *priv = pbar->priv;
-  GtkOrientation orientation;
   gboolean inverted;
-  GtkStyleContext *context;
-  GtkBorder padding;
   int width, height;
-  int bar_width, bar_height;
 
-  context = gtk_widget_get_style_context (widget);
-  gtk_style_context_get_padding (context, gtk_style_context_get_state (context), &padding);
-
-  orientation = priv->orientation;
   inverted = priv->inverted;
   if (gtk_widget_get_direction (widget) == GTK_TEXT_DIR_RTL)
     {
@@ -1133,62 +1102,11 @@ gtk_progress_bar_draw (GtkWidget *widget,
   width = gtk_widget_get_allocated_width (widget);
   height = gtk_widget_get_allocated_height (widget);
 
-  if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
-    {
-      gtk_widget_style_get (widget, "min-horizontal-bar-height", &bar_height, NULL);
-      bar_width = width;
-    }
-  else
-    {
-      gtk_widget_style_get (widget, "min-vertical-bar-width", &bar_width, NULL);
-      bar_height = height;
-    }
+  gtk_css_gadget_draw (priv->trough, cr);
+  gtk_css_gadget_draw (priv->progress, cr);
 
-  gtk_style_context_save_to_node (context, priv->trough_node);
-
-  gtk_render_background (context, cr, width - bar_width, height - bar_height, bar_width, bar_height);
-  gtk_render_frame (context, cr, width - bar_width, height - bar_height, bar_width, bar_height);
-
-  gtk_style_context_restore (context);
-
-  if (priv->activity_mode)
-    {
-      gtk_progress_bar_paint_activity (pbar, cr,
-                                       orientation, inverted,
-                                       width - bar_width, height - bar_height,
-                                       bar_width, bar_height);
-
-      if (priv->show_text)
-        {
-          gint offset;
-          gint amount;
-
-          gtk_progress_bar_get_activity (pbar, orientation, &offset, &amount);
-          gtk_progress_bar_paint_text (pbar, cr,
-                                       offset, amount,
-                                       orientation, inverted,
-                                       width, height);
-        }
-    }
-  else
-    {
-      gint amount;
-      gint space;
-
-      if (orientation == GTK_ORIENTATION_HORIZONTAL)
-        space = bar_width - padding.left - padding.right;
-      else
-        space = bar_height - padding.top - padding.bottom;
-
-      amount = space * gtk_progress_bar_get_fraction (pbar);
-
-      gtk_progress_bar_paint_continuous (pbar, cr, amount, orientation, inverted,
-                                         width - bar_width, height - bar_height,
-                                         bar_width, bar_height);
-
-      if (priv->show_text)
-        gtk_progress_bar_paint_text (pbar, cr, -1, amount, orientation, inverted, width, height);
-    }
+  if (priv->show_text)
+    gtk_progress_bar_paint_text (pbar, cr, -1, 0, priv->orientation, inverted, width, height);
 
   return FALSE;
 }
