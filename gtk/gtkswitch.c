@@ -580,23 +580,6 @@ gtk_switch_unmap (GtkWidget *widget)
   GTK_WIDGET_CLASS (gtk_switch_parent_class)->unmap (widget);
 }
 
-static inline void
-gtk_switch_paint_handle (GtkWidget    *widget,
-                         cairo_t      *cr,
-                         GdkRectangle *box)
-{
-  GtkStyleContext *context = gtk_widget_get_style_context (widget);
-
-  gtk_style_context_save_to_node (context, gtk_css_gadget_get_node (GTK_SWITCH (widget)->priv->slider_gadget));
-
-  gtk_render_slider (context, cr,
-                     box->x, box->y,
-                     box->width, box->height,
-                     GTK_ORIENTATION_HORIZONTAL);
-
-  gtk_style_context_restore (context);
-}
-
 static gboolean
 gtk_switch_render_slider (GtkCssGadget *gadget,
                           cairo_t      *cr,
