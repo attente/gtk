@@ -952,6 +952,7 @@ gtk_progress_bar_allocate_trough (GtkCssGadget        *gadget,
   GtkWidget *widget;
   GtkProgressBarPrivate *priv;
   GtkAllocation alloc;
+  gint width, height;
   gboolean inverted;
 
   widget = gtk_css_gadget_get_owner (gadget);
@@ -968,26 +969,32 @@ gtk_progress_bar_allocate_trough (GtkCssGadget        *gadget,
     {
       if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
         {
+          gtk_css_gadget_get_preferred_size (priv->progress, GTK_ORIENTATION_VERTICAL, -1, &height, NULL, NULL, NULL);
+
           alloc.width = MAX (2, allocation->width / priv->activity_blocks);
           alloc.x = allocation->x + priv->activity_pos * (allocation->width - alloc.width);
-          alloc.y = allocation->y;
-          alloc.height = allocation->height;
+          alloc.y = allocation->y + (allocation->height - height) / 2;
+          alloc.height = height;
         }
       else
         {
+          gtk_css_gadget_get_preferred_size (priv->progress, GTK_ORIENTATION_HORIZONTAL, -1, &width, NULL, NULL, NULL);
+
           alloc.height = MAX (2, allocation->height / priv->activity_blocks);
           alloc.y = allocation->y + priv->activity_pos * (allocation->height - alloc.height);
-          alloc.x = allocation->x;
-          alloc.width = allocation->width;
+          alloc.x = allocation->x + (allocation->width - width) / 2;
+          alloc.width = width;
         }
     }
   else
     {
       if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
         {
+          gtk_css_gadget_get_preferred_size (priv->progress, GTK_ORIENTATION_VERTICAL, -1, &height, NULL, NULL, NULL);
+
           alloc.width = allocation->width * priv->fraction;
-          alloc.height = allocation->height;
-          alloc.y = allocation->y;
+          alloc.height = height;
+          alloc.y = allocation->y + (allocation->height - height) / 2;
 
           if (!inverted)
             alloc.x = allocation->x;
@@ -996,9 +1003,11 @@ gtk_progress_bar_allocate_trough (GtkCssGadget        *gadget,
         }
       else
         {
-          alloc.width = allocation->width;
+          gtk_css_gadget_get_preferred_size (priv->progress, GTK_ORIENTATION_HORIZONTAL, -1, &width, NULL, NULL, NULL);
+
+          alloc.width = width;
           alloc.height = allocation->height * priv->fraction;
-          alloc.x = allocation->x;
+          alloc.x = allocation->x + (allocation->width - width) / 2;
 
           if (!inverted)
             alloc.y = allocation->y;
