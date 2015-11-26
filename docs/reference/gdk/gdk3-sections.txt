@@ -773,6 +773,23 @@ GDK_MAX_TIMECOORD_AXES
 </SECTION>
 
 <SECTION>
+<TITLE>GdkSeat</TITLE>
+<FILE>gdkseat</FILE>
+GdkSeat
+gdk_seat_grab
+gdk_seat_ungrab
+gdk_seat_get_capabilities
+gdk_seat_get_pointer
+gdk_seat_get_keyboard
+gdk_seat_get_slaves
+
+<SUBSECTION Standard>
+GDK_SEAT
+GDK_IS_SEAT
+GDK_TYPE_SEAT
+</SECTION>
+
+<SECTION>
 <TITLE>GdkDeviceManager</TITLE>
 <FILE>gdkdevicemanager</FILE>
 GdkDeviceManager
