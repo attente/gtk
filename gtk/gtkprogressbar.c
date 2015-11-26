@@ -25,6 +25,7 @@
 #include "config.h"
 
 #include <string.h>
+#include <math.h>
 
 #include "gtkprogressbar.h"
 #include "gtkorientableprivate.h"
@@ -36,6 +37,7 @@
 #include "gtkcssnodeprivate.h"
 #include "gtkcssstylepropertyprivate.h"
 #include "gtkcsscustomgadgetprivate.h"
+#include "gtkcssnumbervalueprivate.h"
 
 #include "a11y/gtkprogressbaraccessible.h"
 
@@ -356,52 +358,60 @@ gtk_progress_bar_class_init (GtkProgressBarClass *class)
    * The minimum horizontal width of the progress bar.
    *
    * Since: 2.14
+   *
+   * Deprecated: 3.20: Use the standard CSS property min-width.
    */
   gtk_widget_class_install_style_property (widget_class,
                                            g_param_spec_int ("min-horizontal-bar-width",
                                                              P_("Minimum horizontal bar width"),
                                                              P_("The minimum horizontal width of the progress bar"),
                                                              1, G_MAXINT, MIN_HORIZONTAL_BAR_WIDTH,
-                                                             G_PARAM_READWRITE));
+                                                             G_PARAM_READWRITE|G_PARAM_DEPRECATED));
   /**
    * GtkProgressBar:min-horizontal-bar-height:
    *
    * Minimum horizontal height of the progress bar.
    *
    * Since: 2.14
+   *
+   * Deprecated: 3.20: Use the standard CSS property min-height.
    */
   gtk_widget_class_install_style_property (widget_class,
                                            g_param_spec_int ("min-horizontal-bar-height",
                                                              P_("Minimum horizontal bar height"),
                                                              P_("Minimum horizontal height of the progress bar"),
                                                              1, G_MAXINT, MIN_HORIZONTAL_BAR_HEIGHT,
-                                                             G_PARAM_READWRITE));
+                                                             G_PARAM_READWRITE|G_PARAM_DEPRECATED));
   /**
    * GtkProgressBar:min-vertical-bar-width:
    *
    * The minimum vertical width of the progress bar.
    *
    * Since: 2.14
+   *
+   * Deprecated: 3.20: Use the standard CSS proeprty min-width.
    */
   gtk_widget_class_install_style_property (widget_class,
                                            g_param_spec_int ("min-vertical-bar-width",
                                                              P_("Minimum vertical bar width"),
                                                              P_("The minimum vertical width of the progress bar"),
                                                              1, G_MAXINT, MIN_VERTICAL_BAR_WIDTH,
-                                                             G_PARAM_READWRITE));
+                                                             G_PARAM_READWRITE|G_PARAM_DEPRECATED));
   /**
    * GtkProgressBar:min-vertical-bar-height:
    *
    * The minimum vertical height of the progress bar.
    *
    * Since: 2.14
+   *
+   * Deprecated: 3.20: Use the standard CSS property min-height.
    */
   gtk_widget_class_install_style_property (widget_class,
                                            g_param_spec_int ("min-vertical-bar-height",
                                                              P_("Minimum vertical bar height"),
                                                              P_("The minimum vertical height of the progress bar"),
                                                              1, G_MAXINT, MIN_VERTICAL_BAR_HEIGHT,
-                                                             G_PARAM_READWRITE));
+                                                             G_PARAM_READWRITE|G_PARAM_DEPRECATED));
 
   gtk_widget_class_set_accessible_type (widget_class, GTK_TYPE_PROGRESS_BAR_ACCESSIBLE);
   gtk_widget_class_set_css_name (widget_class, "progressbar");
@@ -785,6 +795,18 @@ gtk_progress_bar_get_text_size (GtkCssGadget   *gadget,
   g_free (buf);
 }
 
+static gint
+get_number (GtkCssStyle *style,
+            guint        property)
+{
+  double d = _gtk_css_number_value_get (gtk_css_style_get_value (style, property), 100.0);
+
+  if (d < 1)
+    return ceil (d);
+  else
+    return floor (d);
+}
+
 static void
 gtk_progress_bar_get_trough_size (GtkCssGadget   *gadget,
                                   GtkOrientation  orientation,
@@ -798,21 +820,35 @@ gtk_progress_bar_get_trough_size (GtkCssGadget   *gadget,
   GtkWidget *widget;
   GtkProgressBar *pbar;
   GtkProgressBarPrivate *priv;
+  GtkCssStyle *style;
 
   widget = gtk_css_gadget_get_owner (gadget);
   pbar = GTK_PROGRESS_BAR (widget);
   priv = pbar->priv;
 
+  style = gtk_css_gadget_get_style (gadget);
   if (orientation == GTK_ORIENTATION_HORIZONTAL)
     {
-      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+      gint min_width;
+
+      min_width = get_number (style, GTK_CSS_PROPERTY_MIN_WIDTH);
+
+      if (min_width != 0)
+        *minimum = min_width;
+      else if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
         gtk_widget_style_get (widget, "min-horizontal-bar-width", minimum, NULL);
       else
         gtk_widget_style_get (widget, "min-vertical-bar-width", minimum, NULL);
     }
   else
     {
-      if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
+      gint min_height;
+
+      min_height = get_number (style, GTK_CSS_PROPERTY_MIN_HEIGHT);
+
+      if (min_height != 0)
+        *minimum = min_height;
+      else if (priv->orientation == GTK_ORIENTATION_HORIZONTAL)
         gtk_widget_style_get (widget, "min-horizontal-bar-height", minimum, NULL);
       else
         gtk_widget_style_get (widget, "min-vertical-bar-height", minimum, NULL);
