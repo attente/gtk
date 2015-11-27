@@ -71,10 +71,7 @@ struct _GtkSpinnerPrivate
   gboolean active;
 };
 
-static gboolean gtk_spinner_draw       (GtkWidget       *widget,
-                                        cairo_t         *cr);
-static void gtk_spinner_size_allocate  (GtkWidget       *widget,
-                                        GtkAllocation   *allocation);
+static void gtk_spinner_finalize       (GObject         *object);
 static void gtk_spinner_get_property   (GObject         *object,
                                         guint            param_id,
                                         GValue          *value,
@@ -83,14 +80,18 @@ static void gtk_spinner_set_property   (GObject         *object,
                                         guint            param_id,
                                         const GValue    *value,
                                         GParamSpec      *pspec);
-static void gtk_spinner_set_active     (GtkSpinner      *spinner,
-                                        gboolean         active);
+static gboolean gtk_spinner_draw       (GtkWidget       *widget,
+                                        cairo_t         *cr);
+static void gtk_spinner_size_allocate  (GtkWidget       *widget,
+                                        GtkAllocation   *allocation);
 static void gtk_spinner_get_preferred_width (GtkWidget  *widget,
                                         gint            *minimum_size,
                                         gint            *natural_size);
 static void gtk_spinner_get_preferred_height (GtkWidget *widget,
                                         gint            *minimum_size,
                                         gint            *natural_size);
+static void gtk_spinner_set_active     (GtkSpinner      *spinner,
+                                        gboolean         active);
 
 static void     gtk_spinner_get_content_size  (GtkCssGadget        *gadget,
                                                GtkOrientation       orientation,
@@ -122,6 +123,7 @@ gtk_spinner_class_init (GtkSpinnerClass *klass)
   GtkWidgetClass *widget_class;
 
   gobject_class = G_OBJECT_CLASS(klass);
+  gobject_class->finalize = gtk_spinner_finalize;
   gobject_class->get_property = gtk_spinner_get_property;
   gobject_class->set_property = gtk_spinner_set_property;
 
@@ -202,6 +204,16 @@ gtk_spinner_init (GtkSpinner *spinner)
                                                        gtk_spinner_render_contents,
                                                        NULL,
                                                        NULL);
+}
+
+static void
+gtk_spinner_finalize (GObject *object)
+{
+  GtkSpinner *spinner = GTK_SPINNER (object);
+
+  g_clear_object (&spinner->priv->gadget);
+
+  G_OBJECT_CLASS (gtk_spinner_parent_class)->finalize (object);
 }
 
 static void
