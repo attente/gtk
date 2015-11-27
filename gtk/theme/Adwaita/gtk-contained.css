@@ -3742,7 +3742,9 @@ scrolledwindow junction {
     background-color: #e5e5e5; }
 
 separator {
-  color: rgba(0, 0, 0, 0.1); }
+  background: rgba(0, 0, 0, 0.1);
+  min-width: 1px;
+  min-height: 1px; }
   button.file separator.vertical, button.font separator.vertical {
     -GtkWidget-wide-separators: true; }
 
