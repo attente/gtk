@@ -4271,6 +4271,10 @@ gtk_label_draw (GtkWidget *widget,
   return FALSE;
 }
 
+static void layout_to_window_coords (GtkLabel *label,
+                                     gint     *x,
+                                     gint     *y);
+
 static gboolean
 gtk_label_render (GtkCssGadget *gadget,
                   cairo_t      *cr,
@@ -4298,9 +4302,8 @@ gtk_label_render (GtkCssGadget *gadget,
 
   if (priv->text && (*priv->text != '\0'))
     {
-      get_layout_location (label, &lx, &ly);
-
-      cairo_translate (cr, -x, -y);
+      lx = ly = 0;
+      layout_to_window_coords (label, &lx, &ly);
 
       gtk_render_layout (context, cr, lx, ly, priv->layout);
 
@@ -4604,7 +4607,6 @@ window_to_layout_coords (GtkLabel *label,
     }
 }
 
-#if 0
 static void
 layout_to_window_coords (GtkLabel *label,
                          gint     *x,
@@ -4612,25 +4614,26 @@ layout_to_window_coords (GtkLabel *label,
 {
   gint lx, ly;
   GtkWidget *widget;
+  GtkAllocation allocation;
 
   widget = GTK_WIDGET (label);
   
   /* get layout location in widget->window coords */
   get_layout_location (label, &lx, &ly);
-  
+  gtk_widget_get_allocation (widget, &allocation);
+
   if (x)
     {
-      *x += lx;                   /* go to widget->window */
-      *x -= widget->allocation.x; /* go to selection window */
+      *x += lx;           /* go to widget->window */
+      *x -= allocation.x; /* go to selection window */
     }
 
   if (y)
     {
-      *y += ly;                   /* go to widget->window */
-      *y -= widget->allocation.y; /* go to selection window */
+      *y += ly;           /* go to widget->window */
+      *y -= allocation.y; /* go to selection window */
     }
 }
-#endif
 
 static gboolean
 get_layout_index (GtkLabel *label,
