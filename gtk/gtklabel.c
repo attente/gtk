@@ -576,6 +576,13 @@ static void gtk_label_get_content_size (GtkCssGadget   *gadget,
                                         gint           *minimum_baseline,
                                         gint           *natural_baseline,
                                         gpointer        unused);
+static gboolean gtk_label_render       (GtkCssGadget   *gadget,
+                                        cairo_t        *cr,
+                                        int             x,
+                                        int             y,
+                                        int             width,
+                                        int             height,
+                                        gpointer        data);
 
 static GtkBuildableIface *buildable_parent_iface = NULL;
 
@@ -1389,7 +1396,7 @@ gtk_label_init (GtkLabel *label)
                                                      GTK_WIDGET (label),
                                                      gtk_label_get_content_size,
                                                      NULL,
-                                                     NULL,
+                                                     gtk_label_render,
                                                      NULL,
                                                      NULL);
 }
@@ -4255,32 +4262,43 @@ static gboolean
 gtk_label_draw (GtkWidget *widget,
                 cairo_t   *cr)
 {
-  GtkLabel *label = GTK_LABEL (widget);
-  GtkLabelPrivate *priv = label->priv;
-  GtkLabelSelectionInfo *info = priv->select_info;
-  GtkAllocation allocation;
+  gtk_css_gadget_draw (GTK_LABEL (widget)->priv->gadget, cr);
+
+  return FALSE;
+}
+
+static gboolean
+gtk_label_render (GtkCssGadget *gadget,
+                  cairo_t      *cr,
+                  int           x,
+                  int           y,
+                  int           width,
+                  int           height,
+                  gpointer      data)
+{
+  GtkWidget *widget;
+  GtkLabel *label;
+  GtkLabelPrivate *priv;
+  GtkLabelSelectionInfo *info;
   GtkStyleContext *context;
-  gint x, y;
+  gint lx, ly;
+
+  widget = gtk_css_gadget_get_owner (gadget);
+  label = GTK_LABEL (widget);
+  priv = label->priv;
+  info = priv->select_info;
 
   gtk_label_ensure_layout (label);
 
   context = gtk_widget_get_style_context (widget);
-  gtk_widget_get_allocation (widget, &allocation);
-
-  gtk_render_background (context, cr,
-                         0, 0,
-                         allocation.width, allocation.height);
-  gtk_render_frame (context, cr,
-                    0, 0,
-                    allocation.width, allocation.height);
 
   if (priv->text && (*priv->text != '\0'))
     {
-      get_layout_location (label, &x, &y);
+      get_layout_location (label, &lx, &ly);
 
-      cairo_translate (cr, -allocation.x, -allocation.y);
+      cairo_translate (cr, -x, -y);
 
-      gtk_render_layout (context, cr, x, y, priv->layout);
+      gtk_render_layout (context, cr, lx, ly, priv->layout);
 
       if (info && (info->selection_anchor != info->selection_end))
         {
@@ -4297,10 +4315,7 @@ gtk_label_draw (GtkWidget *widget,
               range[1] = tmp;
             }
 
-          clip = gdk_pango_layout_get_clip_region (priv->layout,
-                                                   x, y,
-                                                   range,
-                                                   1);
+          clip = gdk_pango_layout_get_clip_region (priv->layout, lx, ly, range, 1);
 
           cairo_save (cr);
           gtk_style_context_save_to_node (context, info->selection_node);
@@ -4308,11 +4323,8 @@ gtk_label_draw (GtkWidget *widget,
           gdk_cairo_region (cr, clip);
           cairo_clip (cr);
 
-          gtk_render_background (context, cr,
-                                 allocation.x, allocation.y,
-                                 allocation.width, allocation.height);
-
-          gtk_render_layout (context, cr, x, y, priv->layout);
+          gtk_render_background (context, cr, x, y, width, height);
+          gtk_render_layout (context, cr, lx, ly, priv->layout);
 
           gtk_style_context_restore (context);
           cairo_restore (cr);
@@ -4334,7 +4346,7 @@ gtk_label_draw (GtkWidget *widget,
 
               cursor_direction = get_cursor_direction (label);
               gtk_render_insertion_cursor (context, cr,
-                                           x, y,
+                                           lx, ly,
                                            priv->layout, priv->select_info->selection_end,
                                            cursor_direction);
             }
@@ -4350,22 +4362,14 @@ gtk_label_draw (GtkWidget *widget,
               cairo_save (cr);
               gtk_style_context_save_to_node (context, active_link->cssnode);
 
-              clip = gdk_pango_layout_get_clip_region (priv->layout,
-                                                       x, y,
-                                                       range,
-                                                       1);
+              clip = gdk_pango_layout_get_clip_region (priv->layout, lx, ly, range, 1);
 
               gdk_cairo_region (cr, clip);
               cairo_clip (cr);
               cairo_region_destroy (clip);
 
-              gtk_render_background (context, cr,
-                                     allocation.x, allocation.y,
-                                     allocation.width, allocation.height);
-
-              gtk_render_layout (context, cr,
-                                 x, y,
-                                 priv->layout);
+              gtk_render_background (context, cr, x, y, width, height);
+              gtk_render_layout (context, cr, lx, ly, priv->layout);
 
               gtk_style_context_restore (context);
               cairo_restore (cr);
@@ -4376,15 +4380,10 @@ gtk_label_draw (GtkWidget *widget,
               range[0] = focus_link->start;
               range[1] = focus_link->end;
 
-              clip = gdk_pango_layout_get_clip_region (priv->layout,
-                                                       x, y,
-                                                       range,
-                                                       1);
+              clip = gdk_pango_layout_get_clip_region (priv->layout, lx, ly, range, 1);
               cairo_region_get_extents (clip, &rect);
 
-              gtk_render_focus (context, cr,
-                                rect.x, rect.y,
-                                rect.width, rect.height);
+              gtk_render_focus (context, cr, rect.x, rect.y, rect.width, rect.height);
 
               cairo_region_destroy (clip);
             }
