@@ -4077,7 +4077,7 @@ gtk_label_size_allocate (GtkWidget     *widget,
 {
   GtkLabel *label = GTK_LABEL (widget);
   GtkLabelPrivate *priv = label->priv;
-  GdkRectangle clip_rect;
+  GdkRectangle clip_rect, clip;
 
   GTK_WIDGET_CLASS (gtk_label_parent_class)->size_allocate (widget, allocation);
 
@@ -4085,15 +4085,19 @@ gtk_label_size_allocate (GtkWidget     *widget,
     gtk_label_update_layout_width (label);
 
   if (priv->select_info && priv->select_info->window)
-    {
-      gdk_window_move_resize (priv->select_info->window,
-                              allocation->x,
-                              allocation->y,
-                              allocation->width,
-                              allocation->height);
-    }
+    gdk_window_move_resize (priv->select_info->window,
+                            allocation->x,
+                            allocation->y,
+                            allocation->width,
+                            allocation->height);
+
+  gtk_css_gadget_allocate (priv->gadget,
+                           allocation,
+                           gtk_widget_get_allocated_baseline (widget),
+                           &clip);
 
   gtk_label_get_ink_rect (label, &clip_rect);
+  gdk_rectangle_union (&clip_rect, &clip, &clip_rect);
   _gtk_widget_set_simple_clip (widget, &clip_rect);
 }
 
