@@ -72,6 +72,8 @@
 #include "a11y/gtkbuttonaccessible.h"
 #include "gtkapplicationprivate.h"
 #include "gtkactionhelper.h"
+#include "gtkcsscustomgadgetprivate.h"
+#include "gtkcontainerprivate.h"
 
 static const GtkBorder default_default_border = { 0, 0, 0, 0 };
 static const GtkBorder default_default_outside_border = { 0, 0, 0, 0 };
@@ -195,7 +197,28 @@ static void gtk_button_get_preferred_height_and_baseline_for_width (GtkWidget *w
 								    gint      *natural_size,
 								    gint      *minimum_baseline,
 								    gint      *natural_baseline);
-  
+
+static void     gtk_button_get_size      (GtkCssGadget        *gadget,
+                                          GtkOrientation       orientation,
+                                          gint                 for_size,
+                                          gint                *minimum_size,
+                                          gint                *natural_size,
+                                          gint                *minimum_baseline,
+                                          gint                *natural_baseline,
+                                          gpointer             data);
+static void     gtk_button_allocate      (GtkCssGadget        *gadget,
+                                          const GtkAllocation *allocation,
+                                          int                  baseline,
+                                          GtkAllocation       *out_clip,
+                                          gpointer             data);
+static gboolean gtk_button_draw_contents (GtkCssGadget        *gadget,
+                                          cairo_t             *cr,
+                                          int                  x,
+                                          int                  y,
+                                          int                  width,
+                                          int                  height,
+                                          gpointer             data);
+
 static GParamSpec *props[LAST_PROP] = { NULL, };
 static guint button_signals[LAST_SIGNAL] = { 0 };
 
@@ -720,6 +743,15 @@ gtk_button_init (GtkButton *button)
   g_signal_connect (priv->gesture, "update", G_CALLBACK (multipress_gesture_update_cb), button);
   g_signal_connect (priv->gesture, "cancel", G_CALLBACK (multipress_gesture_cancel_cb), button);
   gtk_event_controller_set_propagation_phase (GTK_EVENT_CONTROLLER (priv->gesture), GTK_PHASE_BUBBLE);
+
+  priv->gadget = gtk_css_custom_gadget_new_for_node (gtk_widget_get_css_node (GTK_WIDGET (button)),
+                                                     GTK_WIDGET (button),
+                                                     gtk_button_get_size,
+                                                     gtk_button_allocate,
+                                                     gtk_button_draw_contents,
+                                                     NULL,
+                                                     NULL);
+
 }
 
 static void
@@ -729,8 +761,8 @@ gtk_button_destroy (GtkWidget *widget)
   GtkButtonPrivate *priv = button->priv;
 
   g_clear_pointer (&priv->label_text, g_free);
-
   g_clear_object (&priv->gesture);
+  g_clear_object (&priv->gadget);
 
   GTK_WIDGET_CLASS (gtk_button_parent_class)->destroy (widget);
 }
@@ -787,7 +819,7 @@ gtk_button_add (GtkContainer *container,
   GTK_CONTAINER_CLASS (gtk_button_parent_class)->add (container, widget);
 }
 
-static void 
+static void
 gtk_button_dispose (GObject *object)
 {
   GtkButton *button = GTK_BUTTON (object);
@@ -1803,7 +1835,7 @@ gtk_button_size_allocate (GtkWidget     *widget,
 {
   GtkButton *button = GTK_BUTTON (widget);
   GtkButtonPrivate *priv = button->priv;
-  GtkWidget *child;
+  GtkAllocation clip;
 
   gtk_widget_set_allocation (widget, allocation);
 
@@ -1813,6 +1845,28 @@ gtk_button_size_allocate (GtkWidget     *widget,
                             allocation->y,
                             allocation->width,
                             allocation->height);
+
+  gtk_css_gadget_allocate (priv->gadget,
+                           allocation,
+                           gtk_widget_get_allocated_baseline (widget),
+                           &clip);
+
+  gtk_widget_set_clip (widget, &clip);
+}
+
+static void
+gtk_button_allocate (GtkCssGadget        *gadget,
+                     const GtkAllocation *allocation,
+                     int                  baseline,
+                     GtkAllocation       *out_clip,
+                     gpointer             unused)
+{
+  GtkWidget *widget;
+  GtkButton *button;
+  GtkWidget *child;
+
+  widget = gtk_css_gadget_get_owner (gadget);
+  button = GTK_BUTTON (widget);
 
   child = gtk_bin_get_child (GTK_BIN (button));
   if (child && gtk_widget_get_visible (child))
@@ -1828,7 +1882,6 @@ gtk_button_size_allocate (GtkWidget     *widget,
       child_allocation.width = allocation->width - border.left - border.right;
       child_allocation.height = allocation->height - border.top - border.bottom;
 
-      baseline = gtk_widget_get_allocated_baseline (widget);
       if (baseline != -1)
 	baseline -= border.top;
 
@@ -1838,67 +1891,34 @@ gtk_button_size_allocate (GtkWidget     *widget,
       gtk_widget_size_allocate_with_baseline (child, &child_allocation, baseline);
     }
 
-  _gtk_widget_set_simple_clip (widget, NULL);
+  gtk_container_get_children_clip (GTK_CONTAINER (button), out_clip);
 }
 
 static gboolean
 gtk_button_draw (GtkWidget *widget,
 		 cairo_t   *cr)
 {
-  GtkButton *button = GTK_BUTTON (widget);
-  gint x, y;
-  gint width, height;
-  GtkBorder default_border;
-  GtkBorder default_outside_border;
-  GtkStyleContext *context;
-  GtkStateFlags state;
+  gtk_css_gadget_draw (GTK_BUTTON (widget)->priv->gadget, cr);
 
-  context = gtk_widget_get_style_context (widget);
-  state = gtk_style_context_get_state (context);
+  return FALSE;
+}
 
-  gtk_button_get_props (button, &default_border, &default_outside_border, NULL, NULL);
+static gboolean
+gtk_button_draw_contents (GtkCssGadget *gadget,
+                          cairo_t      *cr,
+                          int           x,
+                          int           y,
+                          int           width,
+                          int           height,
+                          gpointer      data)
+{
+  GtkWidget *widget;
 
-  x = 0;
-  y = 0;
-  width = gtk_widget_get_allocated_width (widget);
-  height = gtk_widget_get_allocated_height (widget);
-
-  if (gtk_widget_has_default (widget) &&
-      gtk_button_get_relief (button) == GTK_RELIEF_NORMAL)
-    {
-      x += default_border.left;
-      y += default_border.top;
-      width -= default_border.left + default_border.right;
-      height -= default_border.top + default_border.bottom;
-    }
-  else if (gtk_widget_get_can_default (widget))
-    {
-      x += default_outside_border.left;
-      y += default_outside_border.top;
-      width -= default_outside_border.left + default_outside_border.right;
-      height -= default_outside_border.top + default_outside_border.bottom;
-    }
-
-  gtk_render_background (context, cr, x, y, width, height);
-  gtk_render_frame (context, cr, x, y, width, height);
-
-  if (gtk_widget_has_visible_focus (widget))
-    {
-      GtkBorder border;
-
-      gtk_style_context_get_border (context, state, &border);
-
-      x += border.left;
-      y += border.top;
-      width -= border.left + border.right;
-      height -= border.top + border.bottom;
-
-      gtk_render_focus (context, cr, x, y, width, height);
-    }
+  widget = gtk_css_gadget_get_owner (gadget);
 
   GTK_WIDGET_CLASS (gtk_button_parent_class)->draw (widget, cr);
 
-  return FALSE;
+  return gtk_widget_has_visible_focus (widget);
 }
 
 static void
@@ -2128,18 +2148,23 @@ gtk_button_finish_activate (GtkButton *button,
 
 
 static void
-gtk_button_get_size (GtkWidget      *widget,
+gtk_button_get_size (GtkCssGadget   *gadget,
 		     GtkOrientation  orientation,
                      gint            for_size,
 		     gint           *minimum_size,
 		     gint           *natural_size,
 		     gint           *minimum_baseline,
-		     gint           *natural_baseline)
+		     gint           *natural_baseline,
+                     gpointer        data)
 {
-  GtkButton *button = GTK_BUTTON (widget);
+  GtkWidget *widget;
+  GtkButton *button;
   GtkWidget *child;
   GtkBorder border;
   gint minimum, natural;
+
+  widget = gtk_css_gadget_get_owner (gadget);
+  button = GTK_BUTTON (widget);
 
   gtk_button_get_full_border (button, &border);
 
@@ -2160,7 +2185,7 @@ gtk_button_get_size (GtkWidget      *widget,
         for_size -= border.left + border.right;
     }
 
-  if ((child = gtk_bin_get_child (GTK_BIN (button))) && 
+  if ((child = gtk_bin_get_child (GTK_BIN (button))) &&
       gtk_widget_get_visible (child))
     {
       gint child_min, child_nat;
@@ -2185,49 +2210,69 @@ gtk_button_get_size (GtkWidget      *widget,
   *natural_size = natural;
 }
 
-static void 
+static void
 gtk_button_get_preferred_width (GtkWidget *widget,
                                 gint      *minimum_size,
                                 gint      *natural_size)
 {
-  gtk_button_get_size (widget, GTK_ORIENTATION_HORIZONTAL, -1, minimum_size, natural_size, NULL, NULL);
+  gtk_css_gadget_get_preferred_size (GTK_BUTTON (widget)->priv->gadget,
+                                     GTK_ORIENTATION_HORIZONTAL,
+                                     -1,
+                                     minimum_size, natural_size,
+                                     NULL, NULL);
 }
 
-static void 
+static void
 gtk_button_get_preferred_height (GtkWidget *widget,
                                  gint      *minimum_size,
                                  gint      *natural_size)
 {
-  gtk_button_get_size (widget, GTK_ORIENTATION_VERTICAL, -1, minimum_size, natural_size, NULL, NULL);
+  gtk_css_gadget_get_preferred_size (GTK_BUTTON (widget)->priv->gadget,
+                                     GTK_ORIENTATION_VERTICAL,
+                                     -1,
+                                     minimum_size, natural_size,
+                                     NULL, NULL);
 }
 
-static void 
+static void
 gtk_button_get_preferred_width_for_height (GtkWidget *widget,
                                            gint       for_size,
                                            gint      *minimum_size,
                                            gint      *natural_size)
 {
-  gtk_button_get_size (widget, GTK_ORIENTATION_HORIZONTAL, for_size, minimum_size, natural_size, NULL, NULL);
+  gtk_css_gadget_get_preferred_size (GTK_BUTTON (widget)->priv->gadget,
+                                     GTK_ORIENTATION_HORIZONTAL,
+                                     for_size,
+                                     minimum_size, natural_size,
+                                     NULL, NULL);
 }
 
-static void 
+static void
 gtk_button_get_preferred_height_for_width (GtkWidget *widget,
                                            gint       for_size,
                                            gint      *minimum_size,
                                            gint      *natural_size)
 {
-  gtk_button_get_size (widget, GTK_ORIENTATION_VERTICAL, for_size, minimum_size, natural_size, NULL, NULL);
+  gtk_css_gadget_get_preferred_size (GTK_BUTTON (widget)->priv->gadget,
+                                     GTK_ORIENTATION_VERTICAL,
+                                     for_size,
+                                     minimum_size, natural_size,
+                                     NULL, NULL);
 }
 
 static void
 gtk_button_get_preferred_height_and_baseline_for_width (GtkWidget *widget,
-							gint       width,
+							gint       for_size,
 							gint      *minimum_size,
 							gint      *natural_size,
 							gint      *minimum_baseline,
 							gint      *natural_baseline)
 {
-  gtk_button_get_size (widget, GTK_ORIENTATION_VERTICAL, width, minimum_size, natural_size, minimum_baseline, natural_baseline);
+  gtk_css_gadget_get_preferred_size (GTK_BUTTON (widget)->priv->gadget,
+                                     GTK_ORIENTATION_VERTICAL,
+                                     for_size,
+                                     minimum_size, natural_size,
+                                     minimum_baseline, natural_baseline);
 }
 
 /**
