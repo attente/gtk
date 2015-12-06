@@ -335,6 +335,10 @@ AC_ARG_ENABLE(wayland-backend,
               [AS_HELP_STRING([--enable-wayland-backend],
                               [enable the wayland gdk backend])],
 			      [backend_set=yes])
+AC_ARG_ENABLE(mir-backend,
+              [AS_HELP_STRING([--enable-mir-backend],
+                              [enable the mir gdk backend])],
+			      [backend_set=yes])
 
 if test -z "$backend_set"; then
   if test "$platform_win32" = yes; then
@@ -451,6 +455,16 @@ if test "$enable_wayland_backend" = "yes"; then
   AM_CONDITIONAL(USE_WAYLAND, true)
 else
   AM_CONDITIONAL(USE_WAYLAND, false)
+fi
+
+if test "$enable_mir_backend" = "yes"; then
+  GDK_BACKENDS="$GDK_BACKENDS mir"
+  GDK_WINDOWING="$GDK_WINDOWING
+#define GDK_WINDOWING_MIR"
+
+  AM_CONDITIONAL(USE_MIR, true)
+else
+  AM_CONDITIONAL(USE_MIR, false)
 fi
 
 # strip leading space
@@ -1896,6 +1910,7 @@ gdk/win32/rc/Makefile
 gdk/win32/rc/gdk.rc
 gdk/quartz/Makefile
 gdk/wayland/Makefile
+gdk/mir/Makefile
 gdk/gdkversionmacros.h
 gtk/Makefile
 gtk/makefile.msc
