@@ -26,7 +26,10 @@
 #include "gtktypebuiltins.h"
 #include "gtkwidgetprivate.h"
 #include "gtkcssnodeprivate.h"
+#include "gtkcsscustomgadgetprivate.h"
 #include "gtkwindowprivate.h"
+#include "gtkwidgetprivate.h"
+#include "gtkcontainerprivate.h"
 #include "a11y/gtkcontaineraccessible.h"
 
 #include <string.h>
@@ -79,6 +82,8 @@ struct _GtkHeaderBarPrivate
   GtkWidget *titlebar_end_separator;
 
   GtkWidget *titlebar_icon;
+
+  GtkCssGadget *gadget;
 };
 
 typedef struct _Child Child;
@@ -583,29 +588,6 @@ construct_label_box (GtkHeaderBar *bar)
   gtk_widget_set_parent (priv->label_box, GTK_WIDGET (bar));
 }
 
-static void
-gtk_header_bar_init (GtkHeaderBar *bar)
-{
-  GtkHeaderBarPrivate *priv;
-
-  priv = gtk_header_bar_get_instance_private (bar);
-
-  gtk_widget_set_has_window (GTK_WIDGET (bar), FALSE);
-  gtk_widget_set_redraw_on_allocate (GTK_WIDGET (bar), FALSE);
-
-  priv->title = NULL;
-  priv->subtitle = NULL;
-  priv->custom_title = NULL;
-  priv->children = NULL;
-  priv->spacing = DEFAULT_SPACING;
-  priv->has_subtitle = TRUE;
-  priv->decoration_layout = NULL;
-  priv->decoration_layout_set = FALSE;
-
-  init_sizing_box (bar);
-  construct_label_box (bar);
-}
-
 static gint
 count_visible_children (GtkHeaderBar *bar)
 {
@@ -940,43 +922,105 @@ gtk_header_bar_compute_size_for_opposing_orientation (GtkWidget *widget,
 }
 
 static void
-gtk_header_bar_get_preferred_width (GtkWidget *widget,
-                                    gint      *minimum_size,
-                                    gint      *natural_size)
+gtk_header_bar_get_content_size (GtkCssGadget   *gadget,
+                                 GtkOrientation  orientation,
+                                 gint            for_size,
+                                 gint           *minimum,
+                                 gint           *natural,
+                                 gint           *minimum_baseline,
+                                 gint           *natural_baseline,
+                                 gpointer        unused)
 {
-  gtk_header_bar_get_size (widget, GTK_ORIENTATION_HORIZONTAL, minimum_size, natural_size);
+  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
+
+  if (for_size < 0)
+    gtk_header_bar_get_size (widget, orientation, minimum, natural);
+  else if (orientation == GTK_ORIENTATION_HORIZONTAL)
+    gtk_header_bar_compute_size_for_orientation (widget, for_size, minimum, natural);
+  else
+    gtk_header_bar_compute_size_for_opposing_orientation (widget, for_size, minimum, natural);
+}
+
+static void
+gtk_header_bar_get_preferred_width (GtkWidget *widget,
+                                    gint      *minimum,
+                                    gint      *natural)
+{
+  GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (GTK_HEADER_BAR (widget));
+
+  gtk_css_gadget_get_preferred_size (priv->gadget,
+                                     GTK_ORIENTATION_HORIZONTAL,
+                                     -1,
+                                     minimum, natural,
+                                     NULL, NULL);
 }
 
 static void
 gtk_header_bar_get_preferred_height (GtkWidget *widget,
-                                     gint      *minimum_size,
-                                     gint      *natural_size)
+                                     gint      *minimum,
+                                     gint      *natural)
 {
-  gtk_header_bar_get_size (widget, GTK_ORIENTATION_VERTICAL, minimum_size, natural_size);
+  GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (GTK_HEADER_BAR (widget));
+
+  gtk_css_gadget_get_preferred_size (priv->gadget,
+                                     GTK_ORIENTATION_VERTICAL,
+                                     -1,
+                                     minimum, natural,
+                                     NULL, NULL);
 }
 
 static void
 gtk_header_bar_get_preferred_width_for_height (GtkWidget *widget,
                                                gint       height,
-                                               gint      *minimum_width,
-                                               gint      *natural_width)
+                                               gint      *minimum,
+                                               gint      *natural)
 {
-  gtk_header_bar_compute_size_for_orientation (widget, height, minimum_width, natural_width);
+  GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (GTK_HEADER_BAR (widget));
+
+  gtk_css_gadget_get_preferred_size (priv->gadget,
+                                     GTK_ORIENTATION_HORIZONTAL,
+                                     height,
+                                     minimum, natural,
+                                     NULL, NULL);
 }
 
 static void
 gtk_header_bar_get_preferred_height_for_width (GtkWidget *widget,
                                                gint       width,
-                                               gint      *minimum_height,
-                                               gint      *natural_height)
+                                               gint      *minimum,
+                                               gint      *natural)
 {
-  gtk_header_bar_compute_size_for_opposing_orientation (widget, width, minimum_height, natural_height);
+  GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (GTK_HEADER_BAR (widget));
+
+  gtk_css_gadget_get_preferred_size (priv->gadget,
+                                     GTK_ORIENTATION_VERTICAL,
+                                     width,
+                                     minimum, natural,
+                                     NULL, NULL);
 }
 
 static void
 gtk_header_bar_size_allocate (GtkWidget     *widget,
                               GtkAllocation *allocation)
 {
+  GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (GTK_HEADER_BAR (widget));
+  GtkAllocation clip;
+
+  gtk_widget_set_allocation (widget, allocation);
+
+  gtk_css_gadget_allocate (priv->gadget, allocation, gtk_widget_get_allocated_baseline (widget), &clip);
+
+  gtk_widget_set_clip (widget, &clip);
+}
+
+static void
+gtk_header_bar_allocate_contents (GtkCssGadget        *gadget,
+                                  const GtkAllocation *allocation,
+                                  int                  baseline,
+                                  GtkAllocation       *out_clip,
+                                  gpointer             unused)
+{
+  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
   GtkHeaderBar *bar = GTK_HEADER_BAR (widget);
   GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (bar);
   GtkRequestedSize *sizes;
@@ -1176,7 +1220,7 @@ gtk_header_bar_size_allocate (GtkWidget     *widget,
       gtk_widget_size_allocate (priv->titlebar_end_box, &child_allocation);
     }
 
-  _gtk_widget_set_simple_clip (widget, NULL);
+  gtk_container_get_children_clip (GTK_CONTAINER (widget), out_clip);
 }
 
 /**
@@ -1395,6 +1439,8 @@ gtk_header_bar_finalize (GObject *object)
   g_free (priv->title);
   g_free (priv->subtitle);
   g_free (priv->decoration_layout);
+
+  g_clear_object (&priv->gadget);
 
   G_OBJECT_CLASS (gtk_header_bar_parent_class)->finalize (object);
 }
@@ -1746,17 +1792,23 @@ static gint
 gtk_header_bar_draw (GtkWidget *widget,
                      cairo_t   *cr)
 {
-  GtkStyleContext *context;
+  GtkHeaderBarPrivate *priv = gtk_header_bar_get_instance_private (GTK_HEADER_BAR (widget));
 
-  context = gtk_widget_get_style_context (widget);
+  gtk_css_gadget_draw (priv->gadget, cr);
 
-  gtk_render_background (context, cr, 0, 0,
-                         gtk_widget_get_allocated_width (widget),
-                         gtk_widget_get_allocated_height (widget));
-  gtk_render_frame (context, cr, 0, 0,
-                    gtk_widget_get_allocated_width (widget),
-                    gtk_widget_get_allocated_height (widget));
+  return FALSE;
+}
 
+static gboolean
+gtk_header_bar_render_contents (GtkCssGadget *gadget,
+                                cairo_t      *cr,
+                                int           x,
+                                int           y,
+                                int           width,
+                                int           height,
+                                gpointer      unused)
+{
+  GtkWidget *widget = gtk_css_gadget_get_owner (gadget);
 
   GTK_WIDGET_CLASS (gtk_header_bar_parent_class)->draw (widget, cr);
 
@@ -1974,6 +2026,40 @@ gtk_header_bar_class_init (GtkHeaderBarClass *class)
 
   gtk_widget_class_set_accessible_role (widget_class, ATK_ROLE_PANEL);
   gtk_widget_class_set_css_name (widget_class, "headerbar");
+}
+
+static void
+gtk_header_bar_init (GtkHeaderBar *bar)
+{
+  GtkHeaderBarPrivate *priv;
+  GtkCssNode *widget_node;
+
+  priv = gtk_header_bar_get_instance_private (bar);
+
+  gtk_widget_set_has_window (GTK_WIDGET (bar), FALSE);
+  gtk_widget_set_redraw_on_allocate (GTK_WIDGET (bar), FALSE);
+
+  priv->title = NULL;
+  priv->subtitle = NULL;
+  priv->custom_title = NULL;
+  priv->children = NULL;
+  priv->spacing = DEFAULT_SPACING;
+  priv->has_subtitle = TRUE;
+  priv->decoration_layout = NULL;
+  priv->decoration_layout_set = FALSE;
+
+  init_sizing_box (bar);
+  construct_label_box (bar);
+
+  widget_node = gtk_widget_get_css_node (GTK_WIDGET (bar));
+  priv->gadget = gtk_css_custom_gadget_new_for_node (widget_node,
+                                                     GTK_WIDGET (bar),
+                                                     gtk_header_bar_get_content_size,
+                                                     gtk_header_bar_allocate_contents,
+                                                     gtk_header_bar_render_contents,
+                                                     NULL,
+                                                     NULL);
+
 }
 
 static void
