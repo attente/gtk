@@ -51,7 +51,8 @@ gdk_mir_screen_get_height_mm (GdkScreen *screen)
 static gint
 gdk_mir_screen_get_number (GdkScreen *screen)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: get number */
+  return 0;
 }
 
 static GdkWindow *
