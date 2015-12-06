@@ -2,6 +2,7 @@
 #include "gdkprivate-mir.h"
 #include "gdkwindow-mir.h"
 #include "gdkvisualprivate.h"
+#include "gdkkeymap-mir.h"
 #include <mir_toolkit/mir_client_library.h>
 
 struct _GdkMirDisplay
@@ -14,6 +15,8 @@ struct _GdkMirDisplay
   GdkVisual *system_visual;
   GdkVisual *rgba_visual;
   GList *visuals;
+
+  GdkKeymap *keymap;
 };
 
 G_DEFINE_TYPE (GdkMirDisplay, gdk_mir_display, GDK_TYPE_DISPLAY)
@@ -223,6 +226,16 @@ gdk_mir_display_set_connection (GdkMirDisplay *self,
 
       mir_connection_set_display_config_change_callback (self->connection, configuration_changed, self);
     }
+}
+
+static void
+gdk_mir_display_dispose (GObject *object)
+{
+  GdkMirDisplay *self = GDK_MIR_DISPLAY (object);
+
+  g_clear_object (&self->keymap);
+
+  G_OBJECT_CLASS (gdk_mir_display_parent_class)->dispose (object);
 }
 
 static void
@@ -452,7 +465,14 @@ gdk_mir_display_create_window_impl (GdkDisplay    *display,
 static GdkKeymap *
 gdk_mir_display_get_keymap (GdkDisplay *display)
 {
-  g_error ("%s", G_STRFUNC);
+  GdkMirDisplay *self = GDK_MIR_DISPLAY (display);
+
+  if (self->keymap)
+    return self->keymap;
+
+  self->keymap = gdk_mir_keymap_new ();
+
+  return self->keymap;
 }
 
 static void
@@ -547,6 +567,7 @@ gdk_mir_display_class_init (GdkMirDisplayClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   GdkDisplayClass *display_class = GDK_DISPLAY_CLASS (klass);
 
+  object_class->dispose = gdk_mir_display_dispose;
   object_class->finalize = gdk_mir_display_finalize;
 
   display_class->window_type = GDK_TYPE_MIR_WINDOW;

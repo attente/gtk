@@ -1,3 +1,4 @@
+#include "gdk.h"
 #include "gdkkeymap-mir.h"
 
 struct _GdkMirKeymap
