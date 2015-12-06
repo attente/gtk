@@ -3,6 +3,7 @@
 #include "gdkwindow-mir.h"
 #include "gdkvisualprivate.h"
 #include "gdkkeymap-mir.h"
+#include "gdkscreen-mir.h"
 #include <mir_toolkit/mir_client_library.h>
 
 struct _GdkMirDisplay
@@ -17,6 +18,7 @@ struct _GdkMirDisplay
   GList *visuals;
 
   GdkKeymap *keymap;
+  GdkScreen *screen;
 };
 
 G_DEFINE_TYPE (GdkMirDisplay, gdk_mir_display, GDK_TYPE_DISPLAY)
@@ -233,6 +235,7 @@ gdk_mir_display_dispose (GObject *object)
 {
   GdkMirDisplay *self = GDK_MIR_DISPLAY (object);
 
+  g_clear_object (&self->screen);
   g_clear_object (&self->keymap);
 
   G_OBJECT_CLASS (gdk_mir_display_parent_class)->dispose (object);
@@ -255,7 +258,14 @@ gdk_mir_display_get_name (GdkDisplay *display)
 static GdkScreen *
 gdk_mir_display_get_default_screen (GdkDisplay *display)
 {
-  g_error ("%s", G_STRFUNC);
+  GdkMirDisplay *self = GDK_MIR_DISPLAY (display);
+
+  if (self->screen)
+    return self->screen;
+
+  self->screen = gdk_mir_screen_new ();
+
+  return self->screen;
 }
 
 static void
