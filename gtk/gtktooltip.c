@@ -41,10 +41,6 @@
 #ifdef GDK_WINDOWING_WAYLAND
 #include "wayland/gdkwayland.h"
 #endif
-#ifdef GDK_WINDOWING_MIR
-#include "mir/gdkmir.h"
-#endif
-
 
 /**
  * SECTION:gtktooltip
@@ -1072,19 +1068,6 @@ found:
         gtk_window_set_transient_for (GTK_WINDOW (tooltip->current_window),
                                       GTK_WINDOW (toplevel));
     }
-#endif
-#ifdef GDK_WINDOWING_MIR
-      /* Set the transient parent on the tooltip when running with the Mir
-       * backend to allow correct positioning of the tooltip windows */
-      if (GDK_IS_MIR_DISPLAY (display))
-        {
-          GtkWidget *toplevel;
-
-          toplevel = gtk_widget_get_toplevel (tooltip->tooltip_widget);
-          if (GTK_IS_WINDOW (toplevel))
-            gtk_window_set_transient_for (GTK_WINDOW (tooltip->current_window),
-                                          GTK_WINDOW (toplevel));
-        }
 #endif
 
   x -= border.left;
