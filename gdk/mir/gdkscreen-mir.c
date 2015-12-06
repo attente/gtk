@@ -153,7 +153,8 @@ gdk_mir_screen_get_setting (GdkScreen   *screen,
                             const gchar *name,
                             GValue      *value)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: get setting */
+  return FALSE;
 }
 
 static gint
