@@ -81,7 +81,7 @@ static void
 gdk_mir_keymap_add_virtual_modifiers (GdkKeymap       *keymap,
                                       GdkModifierType *state)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: add virtual modifiers */
 }
 
 static gboolean
