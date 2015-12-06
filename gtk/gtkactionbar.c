@@ -396,7 +396,6 @@ gtk_action_bar_init (GtkActionBar *action_bar)
                                                      gtk_action_bar_render_contents,
                                                      NULL,
                                                      NULL);
-
 }
 
 static void
