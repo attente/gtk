@@ -95,7 +95,7 @@ static GdkModifierType
 gdk_mir_keymap_get_modifier_mask (GdkKeymap         *keymap,
                                   GdkModifierIntent  intent)
 {
-  g_error ("%s", G_STRFUNC);
+  return GDK_KEYMAP_CLASS (gdk_mir_keymap_parent_class)->get_modifier_mask (keymap, intent);
 }
 
 static guint
