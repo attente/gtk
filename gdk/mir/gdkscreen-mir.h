@@ -9,7 +9,10 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE (GdkMirScreen, gdk_mir_screen, GDK, MIR_SCREEN, GdkScreen)
 
-GdkScreen * gdk_mir_screen_new (void);
+GdkScreen * gdk_mir_screen_new         (void);
+
+void        gdk_mir_screen_set_display (GdkMirScreen *self,
+                                        GdkDisplay   *display);
 
 G_END_DECLS
 

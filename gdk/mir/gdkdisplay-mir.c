@@ -265,6 +265,8 @@ gdk_mir_display_get_default_screen (GdkDisplay *display)
 
   self->screen = gdk_mir_screen_new ();
 
+  gdk_mir_screen_set_display (GDK_MIR_SCREEN (self->screen), display);
+
   return self->screen;
 }
 

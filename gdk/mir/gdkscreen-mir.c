@@ -4,14 +4,24 @@
 struct _GdkMirScreen
 {
   GdkScreen parent_instance;
+
+  GdkDisplay *display;
 };
 
 G_DEFINE_TYPE (GdkMirScreen, gdk_mir_screen, GDK_TYPE_SCREEN)
 
+static void
+gdk_mir_screen_dispose (GObject *object)
+{
+  gdk_mir_screen_set_display (GDK_MIR_SCREEN (object), NULL);
+
+  G_OBJECT_CLASS (gdk_mir_screen_parent_class)->dispose (object);
+}
+
 static GdkDisplay *
 gdk_mir_screen_get_display (GdkScreen *screen)
 {
-  g_error ("%s", G_STRFUNC);
+  return GDK_MIR_SCREEN (screen)->display;
 }
 
 static gint
@@ -223,7 +233,10 @@ gdk_mir_screen_get_monitor_scale_factor (GdkScreen *screen,
 static void
 gdk_mir_screen_class_init (GdkMirScreenClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
   GdkScreenClass *screen_class = GDK_SCREEN_CLASS (klass);
+
+  object_class->dispose = gdk_mir_screen_dispose;
 
   screen_class->get_display = gdk_mir_screen_get_display;
   screen_class->get_width = gdk_mir_screen_get_width;
@@ -268,4 +281,17 @@ GdkScreen *
 gdk_mir_screen_new (void)
 {
   return g_object_new (GDK_TYPE_MIR_SCREEN, NULL);
+}
+
+void
+gdk_mir_screen_set_display (GdkMirScreen *self,
+                            GdkDisplay   *display)
+{
+  if (display == self->display)
+    return;
+
+  g_clear_object (&self->display);
+
+  if (display)
+    self->display = g_object_ref (display);
 }
