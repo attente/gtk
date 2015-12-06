@@ -1,13 +1,37 @@
 #include "gdkdisplay-mir.h"
 #include "gdkprivate-mir.h"
 #include "gdkwindow-mir.h"
+#include <mir_toolkit/mir_client_library.h>
 
 struct _GdkMirDisplay
 {
   GdkDisplay parent_instance;
+
+  MirConnection *connection;
 };
 
 G_DEFINE_TYPE (GdkMirDisplay, gdk_mir_display, GDK_TYPE_DISPLAY)
+
+static void
+gdk_mir_display_set_connection (GdkMirDisplay *self,
+                                MirConnection *connection)
+{
+  if (connection == self->connection)
+    return;
+
+  g_clear_pointer (&self->connection, mir_connection_release);
+
+  if (connection)
+    self->connection = connection;
+}
+
+static void
+gdk_mir_display_finalize (GObject *object)
+{
+  gdk_mir_display_set_connection (GDK_MIR_DISPLAY (object), NULL);
+
+  G_OBJECT_CLASS (gdk_mir_display_parent_class)->finalize (object);
+}
 
 static const gchar *
 gdk_mir_display_get_name (GdkDisplay *display)
@@ -320,7 +344,10 @@ gdk_mir_display_make_gl_context_current (GdkDisplay   *display,
 static void
 gdk_mir_display_class_init (GdkMirDisplayClass *klass)
 {
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
   GdkDisplayClass *display_class = GDK_DISPLAY_CLASS (klass);
+
+  object_class->finalize = gdk_mir_display_finalize;
 
   display_class->window_type = GDK_TYPE_MIR_WINDOW;
   display_class->get_name = gdk_mir_display_get_name;
@@ -382,5 +409,29 @@ gdk_mir_display_new (void)
 GdkDisplay *
 _gdk_mir_display_open (const char *name)
 {
-  return NULL;
+  GdkDisplay *display = gdk_display_get_default ();
+  MirConnection *connection;
+
+  if (display)
+    return display;
+
+  connection = mir_connect_sync (NULL, g_get_prgname ());
+
+  if (!connection)
+    return NULL;
+
+  if (!mir_connection_is_valid (connection))
+    {
+      mir_connection_release (connection);
+
+      return NULL;
+    }
+
+  display = gdk_mir_display_new ();
+
+  gdk_mir_display_set_connection (GDK_MIR_DISPLAY (display), connection);
+
+  g_signal_emit_by_name (display, "opened");
+
+  return display;
 }

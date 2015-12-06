@@ -462,6 +462,8 @@ if test "$enable_mir_backend" = "yes"; then
   GDK_WINDOWING="$GDK_WINDOWING
 #define GDK_WINDOWING_MIR"
 
+  MIR_PACKAGES="mirclient"
+
   AM_CONDITIONAL(USE_MIR, true)
 else
   AM_CONDITIONAL(USE_MIR, false)
@@ -1309,7 +1311,7 @@ CFLAGS="$saved_cflags"
 LDFLAGS="$saved_ldflags"
 
 GDK_PACKAGES="$PANGO_PACKAGES gdk-pixbuf-2.0 >= gdk_pixbuf_required_version cairo >= cairo_required_version cairo-gobject >= cairo_required_version"
-GDK_PRIVATE_PACKAGES="$GDK_GIO_PACKAGE $X_PACKAGES $WAYLAND_PACKAGES $cairo_backends epoxy >= epoxy_required_version"
+GDK_PRIVATE_PACKAGES="$GDK_GIO_PACKAGE $X_PACKAGES $WAYLAND_PACKAGES $MIR_PACKAGES $cairo_backends epoxy >= epoxy_required_version"
 
 PKG_CHECK_MODULES(GDK_DEP, $GDK_PACKAGES $GDK_PRIVATE_PACKAGES)
 GDK_DEP_LIBS="$GDK_EXTRA_LIBS $GDK_DEP_LIBS $MATH_LIB"
