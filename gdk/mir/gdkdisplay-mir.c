@@ -1,5 +1,6 @@
 #include "gdkdisplay-mir.h"
 #include "gdkprivate-mir.h"
+#include "gdkwindow-mir.h"
 
 struct _GdkMirDisplay
 {
@@ -321,7 +322,7 @@ gdk_mir_display_class_init (GdkMirDisplayClass *klass)
 {
   GdkDisplayClass *display_class = GDK_DISPLAY_CLASS (klass);
 
-  display_class->window_type = GDK_TYPE_WINDOW;
+  display_class->window_type = GDK_TYPE_MIR_WINDOW;
   display_class->get_name = gdk_mir_display_get_name;
   display_class->get_default_screen = gdk_mir_display_get_default_screen;
   display_class->beep = gdk_mir_display_beep;

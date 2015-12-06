@@ -9,4 +9,5 @@ noinst_LTLIBRARIES = \
 libgdk_mir_la_SOURCES = \
 	gdkdisplay-mir.c \
 	gdkkeymap-mir.c \
-	gdkscreen-mir.c
+	gdkscreen-mir.c \
+	gdkwindow-mir.c
