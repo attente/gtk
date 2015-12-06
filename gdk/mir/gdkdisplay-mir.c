@@ -278,7 +278,7 @@ gdk_mir_display_queue_events (GdkDisplay *display)
 static void
 gdk_mir_display_make_default (GdkDisplay *display)
 {
-  g_error ("%s", G_STRFUNC);
+  GDK_DISPLAY_CLASS (gdk_mir_display_parent_class)->make_default (display);
 }
 
 static GdkWindow *
