@@ -160,6 +160,31 @@ gtk_check_button_state_flags_changed (GtkWidget     *widget,
 }
 
 static void
+gtk_check_button_direction_changed (GtkWidget        *widget,
+                                    GtkTextDirection  previous_direction)
+{
+  GtkCheckButtonPrivate *priv = gtk_check_button_get_instance_private (GTK_CHECK_BUTTON (widget));
+  GtkWidget *child;
+
+  child = gtk_bin_get_child (GTK_BIN (widget));
+  if (child)
+    {
+      GtkCssNode *node, *parent, *sibling;
+
+      node = gtk_css_gadget_get_node (priv->indicator_gadget);
+      parent = gtk_css_node_get_parent (node);
+      sibling = gtk_widget_get_css_node (child);
+
+      if (gtk_widget_get_direction (widget) == GTK_TEXT_DIR_LTR)
+        gtk_css_node_insert_before (parent, node, sibling);
+      else
+        gtk_css_node_insert_after (parent, node, sibling);
+    }
+
+  GTK_WIDGET_CLASS (gtk_check_button_parent_class)->direction_changed (widget, previous_direction);
+}
+
+static void
 gtk_check_button_finalize (GObject *object)
 {
   GtkCheckButtonPrivate *priv = gtk_check_button_get_instance_private (GTK_CHECK_BUTTON (object));
@@ -186,6 +211,7 @@ gtk_check_button_class_init (GtkCheckButtonClass *class)
   widget_class->size_allocate = gtk_check_button_size_allocate;
   widget_class->draw = gtk_check_button_draw;
   widget_class->state_flags_changed = gtk_check_button_state_flags_changed;
+  widget_class->direction_changed = gtk_check_button_direction_changed;
 
   gtk_widget_class_install_style_property (widget_class,
 					   g_param_spec_int ("indicator-size",
