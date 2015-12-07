@@ -2,6 +2,7 @@
 #include "gdkscreen-mir.h"
 #include "gdkwindow-mir.h"
 #include "gdkwindowimpl-mir.h"
+#include "gdkdisplay-mir.h"
 
 struct _GdkMirScreen
 {
@@ -143,7 +144,7 @@ gdk_mir_screen_get_system_visual (GdkScreen *screen)
 static GdkVisual *
 gdk_mir_screen_get_rgba_visual (GdkScreen *screen)
 {
-  g_error ("%s", G_STRFUNC);
+  return gdk_mir_display_get_rgba_visual (GDK_MIR_DISPLAY (gdk_screen_get_display (screen)));
 }
 
 static gboolean
