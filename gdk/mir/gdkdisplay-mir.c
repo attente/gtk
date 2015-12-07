@@ -322,7 +322,8 @@ static gboolean
 gdk_mir_display_request_selection_notification (GdkDisplay *display,
                                                 GdkAtom     selection)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: request selection notification */
+  return FALSE;
 }
 
 static gboolean
