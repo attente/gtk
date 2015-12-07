@@ -246,7 +246,8 @@ static gint
 gdk_mir_screen_get_monitor_scale_factor (GdkScreen *screen,
                                          gint       monitor_num)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: get monitor scale factor */
+  return 1;
 }
 
 static void
