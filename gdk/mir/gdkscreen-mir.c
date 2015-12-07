@@ -81,7 +81,8 @@ gdk_mir_screen_get_root_window (GdkScreen *screen)
 static gint
 gdk_mir_screen_get_n_monitors (GdkScreen *screen)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: get n monitors */
+  return 1;
 }
 
 static gint
