@@ -11,6 +11,12 @@ G_DECLARE_FINAL_TYPE (GdkMirDisplay, gdk_mir_display, GDK, MIR_DISPLAY, GdkDispl
 
 GdkDisplay * gdk_mir_display_new (void);
 
+GdkVisual * gdk_mir_display_get_system_visual (GdkMirDisplay *self);
+
+GdkVisual * gdk_mir_display_get_rgba_visual (GdkMirDisplay *self);
+
+GList * gdk_mir_display_list_visuals (GdkMirDisplay *self);
+
 G_END_DECLS
 
 #endif /* __GDK_MIR_DISPLAY_H__ */

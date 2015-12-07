@@ -1,6 +1,7 @@
 #include "gdkdisplay-mir.h"
 #include "gdkprivate-mir.h"
 #include "gdkwindow-mir.h"
+#include "gdkvisualprivate.h"
 #include <mir_toolkit/mir_client_library.h>
 
 struct _GdkMirDisplay
@@ -9,20 +10,182 @@ struct _GdkMirDisplay
 
   MirConnection *connection;
   MirDisplayConfiguration *configuration;
+
+  GdkVisual *system_visual;
+  GdkVisual *rgba_visual;
+  GList *visuals;
 };
 
 G_DEFINE_TYPE (GdkMirDisplay, gdk_mir_display, GDK_TYPE_DISPLAY)
+
+static GdkVisual *
+gdk_visual_new_from_pixel_format (MirPixelFormat format)
+{
+  GdkVisual *visual = g_object_new (GDK_TYPE_VISUAL, NULL);
+
+  switch (format)
+    {
+    case mir_pixel_format_invalid:
+      g_warning ("unsupported pixel format: mir_pixel_format_invalid");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_abgr_8888:
+      g_warning ("unsupported pixel format: mir_pixel_format_abgr_8888");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_xbgr_8888:
+      g_warning ("unsupported pixel format: mir_pixel_format_xbgr_8888");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_argb_8888:
+      visual->type = GDK_VISUAL_TRUE_COLOR;
+      visual->depth = 32;
+      visual->byte_order = GDK_LSB_FIRST;
+      visual->colormap_size = 0;
+      visual->bits_per_rgb = 8;
+      visual->red_mask = 0x00ff0000;
+      visual->red_shift = 0;
+      visual->red_prec = 8;
+      visual->green_mask = 0x0000ff00;
+      visual->green_shift = 0;
+      visual->green_prec = 8;
+      visual->blue_mask = 0x000000ff;
+      visual->blue_shift = 0;
+      visual->blue_prec = 8;
+      break;
+
+    case mir_pixel_format_xrgb_8888:
+      visual->type = GDK_VISUAL_TRUE_COLOR;
+      visual->depth = 32;
+      visual->byte_order = GDK_LSB_FIRST;
+      visual->colormap_size = 0;
+      visual->bits_per_rgb = 8;
+      visual->red_mask = 0x00ff0000;
+      visual->red_shift = 0;
+      visual->red_prec = 8;
+      visual->green_mask = 0x0000ff00;
+      visual->green_shift = 0;
+      visual->green_prec = 8;
+      visual->blue_mask = 0x000000ff;
+      visual->blue_shift = 0;
+      visual->blue_prec = 8;
+      break;
+
+    case mir_pixel_format_bgr_888:
+      g_warning ("unsupported pixel format: mir_pixel_format_bgr_888");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_rgb_888:
+      g_warning ("unsupported pixel format: mir_pixel_format_rgb_888");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_rgb_565:
+      g_warning ("unsupported pixel format: mir_pixel_format_rgb_565");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_rgba_5551:
+      g_warning ("unsupported pixel format: mir_pixel_format_rgba_5551");
+      g_object_unref (visual);
+      return NULL;
+
+    case mir_pixel_format_rgba_4444:
+      g_warning ("unsupported pixel format: mir_pixel_format_rgba_4444");
+      g_object_unref (visual);
+      return NULL;
+
+    default:
+      g_warning ("unsupported pixel format");
+      g_object_unref (visual);
+      return NULL;
+    }
+
+  return visual;
+}
+
+static GdkVisual *
+gdk_visual_new_from_pixel_format_with_alpha (MirPixelFormat format)
+{
+  switch (format)
+    {
+    case mir_pixel_format_xbgr_8888:
+      format = mir_pixel_format_abgr_8888;
+      break;
+
+    case mir_pixel_format_xrgb_8888:
+      format = mir_pixel_format_argb_8888;
+      break;
+
+    case mir_pixel_format_bgr_888:
+      format = mir_pixel_format_abgr_8888;
+      break;
+
+    case mir_pixel_format_rgb_888:
+      format = mir_pixel_format_argb_8888;
+      break;
+
+    default:
+      break;
+    }
+
+  return gdk_visual_new_from_pixel_format (format);
+}
+
+static void
+gdk_mir_display_add_pixel_format (GdkMirDisplay  *self,
+                                  MirPixelFormat  format)
+{
+  GdkVisual *visual = gdk_visual_new_from_pixel_format (format);
+
+  if (visual)
+    {
+      visual->screen = gdk_display_get_default_screen (GDK_DISPLAY (self));
+      self->visuals = g_list_append (self->visuals, visual);
+    }
+}
 
 static void
 gdk_mir_display_set_configuration (GdkMirDisplay           *self,
                                    MirDisplayConfiguration *configuration)
 {
+  guint i;
+  guint j;
+
   if (configuration == self->configuration)
     return;
 
+  g_list_free_full (self->visuals, g_object_unref);
+  self->visuals = NULL;
+  g_clear_object (&self->rgba_visual);
+  g_clear_object (&self->system_visual);
   g_clear_pointer (&self->configuration, mir_display_config_destroy);
 
   self->configuration = configuration;
+
+  if (self->configuration)
+    {
+      if (self->configuration->num_outputs > 0)
+        {
+          self->system_visual = gdk_visual_new_from_pixel_format (self->configuration->outputs[0].current_format);
+
+          if (self->system_visual)
+            self->system_visual->screen = gdk_display_get_default_screen (GDK_DISPLAY (self));
+
+          self->rgba_visual = gdk_visual_new_from_pixel_format_with_alpha (self->configuration->outputs[0].current_format);
+
+          if (self->rgba_visual)
+            self->rgba_visual->screen = gdk_display_get_default_screen (GDK_DISPLAY (self));
+        }
+
+      for (i = 0; i < self->configuration->num_outputs; i++)
+        for (j = 0; j < self->configuration->outputs[i].num_output_formats; j++)
+          gdk_mir_display_add_pixel_format (self, self->configuration->outputs[i].output_formats[j]);
+    }
 }
 
 static void
@@ -471,4 +634,22 @@ _gdk_mir_display_open (const char *name)
   g_signal_emit_by_name (display, "opened");
 
   return display;
+}
+
+GdkVisual *
+gdk_mir_display_get_system_visual (GdkMirDisplay *self)
+{
+  return self->system_visual;
+}
+
+GdkVisual *
+gdk_mir_display_get_rgba_visual (GdkMirDisplay *self)
+{
+  return self->rgba_visual;
+}
+
+GList *
+gdk_mir_display_list_visuals (GdkMirDisplay *self)
+{
+  return g_list_copy (self->visuals);
 }
