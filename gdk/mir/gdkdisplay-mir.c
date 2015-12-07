@@ -398,7 +398,8 @@ static GdkCursor *
 gdk_mir_display_get_cursor_for_name (GdkDisplay  *display,
                                      const gchar *name)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: get cursor for name */
+  return NULL;
 }
 
 static GdkCursor *
