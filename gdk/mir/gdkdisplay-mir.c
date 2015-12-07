@@ -473,7 +473,9 @@ gdk_mir_display_create_window_impl (GdkDisplay    *display,
                                     GdkWindowAttr *attributes,
                                     gint           attributes_mask)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: create window impl */
+  window->impl_window = window;
+  window->impl = gdk_mir_window_impl_new ();
 }
 
 static GdkKeymap *
