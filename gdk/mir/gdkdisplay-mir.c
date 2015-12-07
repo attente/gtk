@@ -8,21 +8,58 @@ struct _GdkMirDisplay
   GdkDisplay parent_instance;
 
   MirConnection *connection;
+  MirDisplayConfiguration *configuration;
 };
 
 G_DEFINE_TYPE (GdkMirDisplay, gdk_mir_display, GDK_TYPE_DISPLAY)
 
 static void
+gdk_mir_display_set_configuration (GdkMirDisplay           *self,
+                                   MirDisplayConfiguration *configuration)
+{
+  if (configuration == self->configuration)
+    return;
+
+  g_clear_pointer (&self->configuration, mir_display_config_destroy);
+
+  self->configuration = configuration;
+}
+
+static void
+configuration_changed (MirConnection *connection,
+                       void          *context)
+{
+  GdkMirDisplay *self = GDK_MIR_DISPLAY (context);
+  MirDisplayConfiguration *configuration;
+
+  configuration = mir_connection_create_display_config (self->connection);
+  gdk_mir_display_set_configuration (self, configuration);
+}
+
+static void
 gdk_mir_display_set_connection (GdkMirDisplay *self,
                                 MirConnection *connection)
 {
+  MirDisplayConfiguration *configuration;
+
   if (connection == self->connection)
     return;
+
+  /* TODO: disconnect configuration_changed callback */
+
+  gdk_mir_display_set_configuration (self, NULL);
 
   g_clear_pointer (&self->connection, mir_connection_release);
 
   if (connection)
-    self->connection = connection;
+    {
+      self->connection = connection;
+
+      configuration = mir_connection_create_display_config (self->connection);
+      gdk_mir_display_set_configuration (self, configuration);
+
+      mir_connection_set_display_config_change_callback (self->connection, configuration_changed, self);
+    }
 }
 
 static void
