@@ -143,7 +143,7 @@ gdk_mir_screen_list_visuals (GdkScreen *screen)
 static GdkVisual *
 gdk_mir_screen_get_system_visual (GdkScreen *screen)
 {
-  g_error ("%s", G_STRFUNC);
+  return gdk_mir_display_get_system_visual (GDK_MIR_DISPLAY (gdk_screen_get_display (screen)));
 }
 
 static GdkVisual *
