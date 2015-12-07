@@ -19,7 +19,8 @@ gdk_mir_window_impl_create_similar_image_surface (GdkWindow      *window,
                                                   int             width,
                                                   int             height)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: create similar image surface */
+  return cairo_image_surface_create (format, width, height);
 }
 
 static void
