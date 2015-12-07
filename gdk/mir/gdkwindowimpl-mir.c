@@ -45,7 +45,7 @@ gdk_mir_window_impl_withdraw (GdkWindow *window)
 static void
 gdk_mir_window_impl_raise (GdkWindow *window)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: raise */
 }
 
 static void
