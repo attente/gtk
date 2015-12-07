@@ -1,11 +1,14 @@
 #include "gdk.h"
 #include "gdkscreen-mir.h"
+#include "gdkwindow-mir.h"
+#include "gdkwindowimpl-mir.h"
 
 struct _GdkMirScreen
 {
   GdkScreen parent_instance;
 
   GdkDisplay *display;
+  GdkWindow *root_window;
 };
 
 G_DEFINE_TYPE (GdkMirScreen, gdk_mir_screen, GDK_TYPE_SCREEN)
@@ -13,7 +16,11 @@ G_DEFINE_TYPE (GdkMirScreen, gdk_mir_screen, GDK_TYPE_SCREEN)
 static void
 gdk_mir_screen_dispose (GObject *object)
 {
-  gdk_mir_screen_set_display (GDK_MIR_SCREEN (object), NULL);
+  GdkMirScreen *self = GDK_MIR_SCREEN (object);
+
+  g_clear_object (&self->root_window);
+
+  gdk_mir_screen_set_display (self, NULL);
 
   G_OBJECT_CLASS (gdk_mir_screen_parent_class)->dispose (object);
 }
@@ -58,7 +65,17 @@ gdk_mir_screen_get_number (GdkScreen *screen)
 static GdkWindow *
 gdk_mir_screen_get_root_window (GdkScreen *screen)
 {
-  g_error ("%s", G_STRFUNC);
+  GdkMirScreen *self = GDK_MIR_SCREEN (screen);
+
+  if (self->root_window)
+    return self->root_window;
+
+  self->root_window = gdk_mir_window_new ();
+  self->root_window->window_type = GDK_WINDOW_ROOT;
+  self->root_window->impl_window = self->root_window;
+  self->root_window->impl = gdk_mir_window_impl_new ();
+
+  return self->root_window;
 }
 
 static gint
