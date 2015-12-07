@@ -126,7 +126,12 @@ gdk_mir_screen_get_monitor_workarea (GdkScreen    *screen,
                                      gint          monitor_num,
                                      GdkRectangle *dest)
 {
-  g_error ("%s", G_STRFUNC);
+  /* TODO: get monitor workarea */
+
+  dest->x = 0;
+  dest->y = 0;
+  dest->width = 1280;
+  dest->height = 800;
 }
 
 static GList *
