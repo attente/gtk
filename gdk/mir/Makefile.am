@@ -11,4 +11,5 @@ libgdk_mir_la_SOURCES = \
 	gdkkeymap-mir.c \
 	gdkscreen-mir.c \
 	gdkwindow-mir.c \
-	gdkcursor-mir.c
+	gdkcursor-mir.c \
+	gdkwindowimpl-mir.c
